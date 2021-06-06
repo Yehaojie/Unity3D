@@ -1,0 +1,134 @@
+lua程序文件在VS打开编辑代码
+XluaInFile.lua
+print('hello world!')
+a=5
+b="abc"
+c=false;
+
+Person={
+   name="ye",
+   age=120,
+   3,
+}
+function Person:eat(a,b)
+print(a+b)
+end
+
+function add(a,b)
+print(a+b)
+return a+b,a,b
+end
+
+--在Lua中创建使用C#的GameObject类
+--CS.UnityEngine.GameObject("Create by lua");
+
+--把游戏物体的类赋值到gameObject中方便调用
+local gameObject = CS.UnityEngine.GameObject
+
+--利用gameObject类找到名为Main Camera的游戏物体
+local camera = gameObject.Find("Main Camera")
+
+--给游戏物体的名字改名为update by lua
+camera.name="update by lua"
+
+--找到这个游戏物体的Camera组件并赋值到CameraCom
+local CameraCom=camera:GetComponent("Camera")
+
+--找到游戏物体之后销毁
+gameObject.Destroy(CameraCom)
+
+CScript：
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using XLua;
+using System.IO;
+using System;
+
+public class Xlua : MonoBehaviour {
+
+    private LuaEnv luaEnv;
+
+	void Start ()
+    {
+        luaEnv = new LuaEnv();//建议只创建一个LuaEnv对象
+
+        luaEnv.DoString("print('Hello world!')");//XLua环境中输出Hello world!
+
+        luaEnv.DoString("CS.UnityEngine.Debug.Log('Hello world!')");//用XLua去调用C#的方法进行输出文字
+
+        //TextAsset XluaInFile = Resources.Load<TextAsset>("XluaInFile.lua");//从本地的Resources文件夹去查找带有txt格式的XluaInFile.lua文件
+
+        luaEnv.DoString("require 'XluaInFile'");//上述方法二，用require方法去Resources文件夹中调用Loader查找XluaInFile文件并用Lua虚拟机运行
+
+        int a = luaEnv.Global.Get<int>("a");//从C#去获取Lua文件里的值
+        print(a);
+
+        luaEnv.AddLoader(MyLoader);//通过自定义Loader去加载我们自定义的文件里的Lua文件
+
+        Person p = luaEnv.Global.Get<Person>("Person");//1.通过class（struct）从C#调用lua文件里的Person数据储存到p对象中
+        print(p.name);
+        print(p.age);
+
+        IPerson Ip = luaEnv.Global.Get<IPerson>("Person");//2.通过Interface从C#调用lua文件里的Person数据储存到p对象中
+        Ip.eat(12, 23);
+
+        //3.通过Dictionary
+        Dictionary<string, object> dict = luaEnv.Global.Get<Dictionary<string, object>>("Person");
+        foreach(string key in dict.Keys)
+        {
+            print(key + "-" + dict[key]);
+        }
+
+        //4.通过List：映射出没有Key的Value值
+        List<object> list = luaEnv.Global.Get<List<object>>("Person");
+        foreach(object o in list)
+        {
+            print(o);
+        }
+
+        //5.通过LuaTable:不推荐使用，效率不高，但是不需要生成代码
+        LuaTable Tab = luaEnv.Global.Get<LuaTable>("Person");
+        print(Tab.Get<string>("name"));
+        print(Tab.Get<int>("age"));
+
+        //使用C#访问Lua全局函数
+        Add add = luaEnv.Global.Get<Add>("add");
+        int c;
+        int d;
+        int res = add(12, 14,out c,out d);
+        print(res);
+        print(c);
+        print(d);
+        add = null;
+    }
+    
+    //使用C#访问Lua全局函数要创建委托
+    [CSharpCallLua]
+    delegate int Add(int a, int b,out int c,out int d);
+
+    private byte[] MyLoader(ref string filePath)
+    {
+        string path = Application.streamingAssetsPath + "/" + filePath + ".lua.txt";//查找streamingAssets文件夹下的后缀名为.lua.txt的lua文件并回调到Lua虚拟机运行
+        return System.Text.Encoding.UTF8.GetBytes(File.ReadAllText(path));
+    }
+
+    private void OnDestroy()
+    {
+        luaEnv.Dispose();
+    }
+
+    public class Person//当要调用lua的数据表的时候，我们需要在C#里添加一个类来映射lua里的信息，这样才能在C#运用
+    {
+        public string name;
+        public int age;
+    }
+
+    [CSharpCallLua]//接口可以改变Lua的值，但是要添加一个属性
+    interface IPerson
+    {
+        string name { get; set; }
+        int age { get; set; }
+        void eat(int a, int b);
+    }
+}
